@@ -105,6 +105,8 @@ luna-send -n 1 'luna://com.webos.applicationManager/listApps' '{}' | grep -o '"i
 | Show pointer | 1198 |
 | Hide pointer | 1199 |
 
+The full keymap for my TV/remote combo can be found [here](https://github.com/KevinLWorthington/lg-native-hook/blob/main/Key%20Maps/Key_Map_MR23.md).
+
 ## Logs
 
 ```bash
