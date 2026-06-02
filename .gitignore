@@ -1,0 +1,6 @@
+*.so
+*.ipk
+*.zip
+install.sh
+uninstall.sh
+pkg/
