@@ -1,6 +1,6 @@
 {
     "id": "org.kevinlworthington.lginputhook",
-    "version": "0.9.0",
+    "version": "0.9.1",
     "vendor": "Kevin Worthington",
     "type": "web",
     "main": "index.html",
