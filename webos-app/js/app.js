@@ -630,7 +630,7 @@ function openDetector() {
                 seen.innerHTML = '';
                 codes.slice(-6).reverse().forEach(function (code) {
                     var k = keyByCode(code);
-                    var row = el('div', { 'class': 'detected-row focusable', tabindex: '-1', text: (k ? k.name : 'Unknown') + ' — code ' + code + '  (select to remap)' });
+                    var row = el('div', { 'class': 'detected-row focusable', tabindex: '-1', text: (k ? k.name : 'Unknown') + ' — code ' + code });
                     row.addEventListener('click', function () {
                         closeModal(overlay);
                         openMappingEditor(code);
