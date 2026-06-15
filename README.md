@@ -1,160 +1,96 @@
-# lginput-native-hook
+#  ![icon](/webos-app/icon.png)Mahta
 
-A native LD_PRELOAD hook for `lginput2` on **webOS 24+ (9.x)** TVs.
+*Wield your remote.*
 
-Remaps or disables Magic Remote buttons, including app shortcut keys, scroll
-wheel, and pointer cursor. Compatible with webOS 9.x where lginputhook fails.
+A webOS app for [lginput-native-hook](lginput-native-hook/README.md) that lets you install the
+hook and remap Magic Remote buttons directly on the TV, with the remote.
 
-Installed and configured using CLI.
+
+## Features
+For detailed usage instructions, see the [**Using the App**](#using-the-app) section below.
+
+- [**Status & Install**](#status--install) shows whether the hook library, LD_PRELOAD activation,
+  boot persistence, and `lginput2` are healthy.
+- [**Remote**](#remote) shows an interactive, on-screen representation of a Magic Remote.
+- [**Button List**](#button-list) shows every key based on [this list](https://gist.githubusercontent.com/Simon34545/fc5c91e0456789dd7a56a947c1148939/raw/) and my limited testing.
+- [**Apps**](#apps) shows all apps installed on the TV.
 
 ## Requirements
 
-- LG webOS TV running webOS 9.x (2024 models)
-- [Homebrew Channel](https://github.com/webosbrew/webos-homebrew-channel) installed
-- Root access enabled in Homebrew Channel settings
+- LG webOS 9.x TV, webOS 24(tested, working), rooted, with the
+  [Homebrew Channel](https://github.com/webosbrew/webos-homebrew-channel)
+  installed. The app executes privileged operations through the Homebrew
+  Channel's root service (`org.webosbrew.hbchannel.service/exec`), so the
+  Homebrew Channel must be present and the TV must be rooted.
 
-## Installation
+## Building the IPK
 
-**Step 1** — Copy the scripts to your TV:
+Requires the webOS CLI tools (`npm install -g @webos-tools/cli`):
+
+Clone the repo, then:
 ```bash
-scp install.sh uninstall.sh root@<TV_IP>:/tmp/
+cd Mahta
+ares-package webos-app -o dist
 ```
 
-**Step 2** — Install:
-```bash
-ssh root@<TV_IP> 'sh /tmp/install.sh'
-```
+This produces `dist/org.kevinlworthington.lginputhook_0.9.0_all.ipk`.
 
-That's it. The hook activates immediately.
+> The hook's `install.sh` / `uninstall.sh` are bundled in `webos-app/assets/`.
+> If you rebuild the hook with `build.sh`, copy the regenerated scripts there
+> before packaging.
 
-## Uninstall
+## Installing on the TV
 
-```bash
-ssh root@<TV_IP> 'sh /tmp/uninstall.sh'
-```
+Download the latest version from [Releases](https://github.com/KevinLWorthington/Mahta/releases/latest)
+or build with instructions above.
 
-The uninstall script removes all files and restores the remote to normal.
-It will ask whether to keep or remove your keybinds config.
-
-## Configuration
-
-Use `vi /home/root/.config/lginputhook/keybinds.json` via SSH on the TV to edit the config.
-
-### Basic Vi syntax:
-
-Pressing `ESC` enters command mode.
-
-`i` allows editing text
-
-While in command mode:
-
-`:w` saves changes.
-
-`:q` Exits
-
-`:!q` Exits wihout saving.
-
-
-Changes are picked up automatically.
-
-> **NOTE:** While not strictly required, changing the `"reload"` number when saving the file changes the file size and ensures an automatic config reload.
-
-Example keybinds.json:
-
-```json
-{
-    "1037": {"action": "launch", "id": "youtube.leanback.v4"},
-    "1038": {"action": "launch", "id": "io.strem.tv"},
-    "1042": {"action": "replace", "keycode": 1038},
-    "1198": {"action": "disable"}, #Cursor show ID
-    "1199": {"action": "disable"}, #Cursor hide ID
-    "reload": "2"
-}
-```
-
-### Actions
-
-| Action | Description | Extra field |
-|--------|-------------|-------------|
-| `disable` | Swallows the button press; does nothing | — |
-| `replace` | Sends a different key code instead | `"keycode": <id>` |
-| `launch` | Opens a webOS app | `"id": "<app_id>"` |
-
-### Finding button codes
-
-Press buttons and watch the log:
-```bash
-tail -f /tmp/lginput-hook-native.log
-```
-
-### Finding app IDs
-```bash
-luna-send -n 1 'luna://com.webos.applicationManager/listApps' '{}' | grep -o '"id":"[^"]*"\|"title":"[^"]*"' | paste - -
-```
-
-### Example codes (MR23 Magic Remote, 2023)
-
-| Button | Code |
-|--------|------|
-| Netflix | 1037 |
-| Prime Video | 1038 |
-| Disney+ | 1042 |
-| LG Channels | 1043 |
-| Alexa | 1086 |
-| Sling | 1107 |
-| Show pointer | 1198 |
-| Hide pointer | 1199 |
-
-The full keymap for my TV/remote combo can be found [here](https://github.com/KevinLWorthington/lg-native-hook/blob/main/Key%20Maps/Key_Map_MR23.md).
-
-## Logs
+With root SSH access (Homebrew Channel):
 
 ```bash
-tail -f /tmp/lginput-hook-native.log
+scp dist/org.kevinlworthington.lginputhook_0.9.0_all.ipk root@<TV_IP>:/tmp/
+ssh root@<TV_IP> "luna-send -i 'luna://com.webos.appInstallService/dev/install' \
+  '{\"id\":\"org.kevinlworthington.lginputhook\",\"ipkUrl\":\"/tmp/org.kevinlworthington.lginputhook_0.9.0_all.ipk\",\"subscribe\":true}'"
 ```
 
-## Building from source
+(Press Ctrl-C once it reports `installed`.)
 
-Requires WSL or Linux with `arm-linux-gnueabi-gcc`:
-```bash
-sudo apt install gcc-arm-linux-gnueabi binutils
-./build.sh
-```
+Or, with WebOS Dev Manager:
 
-This produces `install.sh` and `uninstall.sh`.
+- Select "Apps" at the top left, click "Install" at the top right, navigate to and select the .ipk.
 
-## How it works
+The app then appears in the TV's launcher bar as **Mahta**.
 
-`lginput2` is LG's input daemon — it processes all remote control events and
-writes them to `/dev/uinput`. This hook intercepts those `write()` calls via
-`LD_PRELOAD`, inspecting each input event before it reaches the kernel.
+## Using the app
+### Status & Install
+- Install, reinstall, uninstall the hook and restart `lginput2` with one click.
+  The install/uninstall scripts for the hook are bundled inside the app.
+![Not installed](/screenshots/001.png)
+![Installed](/screenshots/002.png)
+### Remote
+- Navigate to a button. Select it to remap it.
+- If a button's default behavior has been changed, it will get a color coded dot.
+![Remote hidden buttons](/screenshots/003.png)
+- Show the hidden nav/power buttons. You'll be warned if you try to remap one of these buttons.
+![Remote unhidden buttons](/screenshots/004.png)
+![Remap a button](/screenshots/005.png)
+### Button List
+- Show the entire list of known buttons. Click "Identify a button..." to check what a button on your remote does.
+- Select a button to remap it.
+![Button list](/screenshots/006.png)
+![ID a button](/screenshots/007.png)
+### Apps
+- Shows a list of all apps installed on the TV. Select one to launch it.
+![App list](/screenshots/008.png)
+![Selected app](/screenshots/009.png)
 
-- `EV_REL` events (pointer movement) are dropped to suppress cursor movement
-- `EV_KEY` events are matched against the keybinds config for disable/replace/launch
-- App launches use `fork()` + `execve()` to call `luna-send` directly
-- Uses only raw ARM syscalls
-- Activated via `LD_PRELOAD` in `/var/systemd/system/env/lginput2.env`
-- Persists across reboots via `/var/lib/webosbrew/init.d/` startup hook
 
-## Compatibility
 
-| webOS version | Year | Status |
-|---------------|------|--------|
-| 9.x | 2024 | ✅ Tested on OLED65C3PUA |
-| 8.x | 2023 | ⚠️ Untested; may work |
-| 7.x and older | 2022- | ❌ Use [lginputhook](https://github.com/Simon34545/lginputhook) instead |
+## Additional Notes and Safety Concerns
 
-## Disclaimer
-
-I make no guarantees of functionality, compatibility or that you won't damage something by using these scripts.
-
-This project was intended for my personal use and has only been tested on a single TV (OLED65C3PUA).
-My main goal was simply to disable the annoying cursor and dedicated app buttons on my remote. The other implementations available for remote remapping wouldn't work on my TV.
-
-Claude AI was heavily used in developing these scripts. While I understand the disdain for AI, it allowed me to get a project going in a matter of hours that would have likely taken me days or weeks, if I would have been able to keep up with it at all.
-
-I'm sharing the project for anyone interested in trying it or for those smarter than me to run with it and make something better.
-
-I would like to create an app that can be installed via HomeBrew that would allow customisation directly on the TV, but I do not know if I will get to it or not.
-
-If you test this on your TV/remote, [let me know](https://github.com/KevinLWorthington/lg-native-hook/discussions/1).
+- As long as you have SSH access to your TV, the app should be safe.
+  Still, use the app at your own risk. I've only tested this to work on my TV/remote (OLED65C3, WebOS 24 v9.x, MR23 Magic Remote).
+- Remapping OK / arrows / Back / Home can make the TV (and this app) hard or impossible to
+  drive with the remote. These buttons are hidden in the app by default and can be shown by selecting the
+  "Show navigation and power buttons" checkbox. A warning will appear when attempting to remap
+  any of these buttons. If you do lock yourself out, i.e remap the OK/Select button, SSH in and
+  edit/delete the keybinds file (/home/root/.config/lginputhook/keybinds.json).

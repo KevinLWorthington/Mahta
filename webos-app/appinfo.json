@@ -1,0 +1,14 @@
+{
+    "id": "org.kevinlworthington.lginputhook",
+    "version": "0.9.0",
+    "vendor": "Kevin Worthington",
+    "type": "web",
+    "main": "index.html",
+    "title": "Mahta",
+    "icon": "icon.png",
+    "largeIcon": "largeIcon.png",
+    "iconColor": "#a50034",
+    "bgColor": "#14171c",
+    "resolution": "1920x1080",
+    "disableBackHistoryAPI": true
+}

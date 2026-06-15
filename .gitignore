@@ -1,6 +1,13 @@
 *.so
 *.ipk
 *.zip
-install.sh
-uninstall.sh
+/install.sh
+/uninstall.sh
 pkg/
+dist/
+.claude/
+webos-app/js/luna.mock.js
+
+# webos-app build assets
+!webos-app/assets/install.sh
+!webos-app/assets/uninstall.sh

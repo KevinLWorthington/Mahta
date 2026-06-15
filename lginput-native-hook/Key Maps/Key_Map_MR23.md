@@ -21,7 +21,7 @@
 | KEY_LEFT | 105 |
 | KEY_RIGHT | 106 |
 | KEY_BACK | 412 |
-| KEY_HOME | 139 |
+| KEY_SETTINGS | 139 | #Gear button |
 | KEY_INFO | 358 |
 | KEY_CURSOR(Q) | 1198 | #Show Cursor |
 | KEY_CURSOR(Q2) | 1199 | #Hide Cursor |
@@ -37,5 +37,13 @@
 | KEY_0 | 11 |
 | KEY_SCREEN_REMOTE | 994 |
 | KEY_GUIDE | 362 |
-| KEY_VOICE | 241 |
-| KEY_POWER | 773 |
+| KEY_INPUT | 241 | #On-screen input selector |
+| KEY_HOME | 773 |
+
+> The physical power button's code has not been captured from the log (the TV
+> powers off before it can be read), but per
+> [LG's own key table](https://gist.github.com/Simon34545/fc5c91e0456789dd7a56a947c1148939)
+> it is almost certainly **116** (`POWER` — the standard Linux `KEY_POWER`,
+> with no RF variant). That table also confirms 773 = `RF_HOME`,
+> 139 = `MENU` (gear), 241 = `TV_VIDEO` (input selector), and
+> 994 = `RF_SCREEN_REMOTE`.
