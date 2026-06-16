@@ -33,7 +33,7 @@ cd Mahta
 ares-package webos-app -o dist
 ```
 
-This produces `dist/org.kevinlworthington.lginputhook_0.9.0_all.ipk`.
+This produces `dist/org.kevinlworthington.lginputhook_<version>_all.ipk`.
 
 > The hook's `install.sh` / `uninstall.sh` are bundled in `webos-app/assets/`.
 > If you rebuild the hook with `build.sh`, copy the regenerated scripts there
@@ -47,9 +47,9 @@ or build with instructions above.
 With root SSH access (Homebrew Channel):
 
 ```bash
-scp dist/org.kevinlworthington.lginputhook_0.9.0_all.ipk root@<TV_IP>:/tmp/
+scp dist/org.kevinlworthington.lginputhook_<version>_all.ipk root@<TV_IP>:/tmp/
 ssh root@<TV_IP> "luna-send -i 'luna://com.webos.appInstallService/dev/install' \
-  '{\"id\":\"org.kevinlworthington.lginputhook\",\"ipkUrl\":\"/tmp/org.kevinlworthington.lginputhook_0.9.0_all.ipk\",\"subscribe\":true}'"
+  '{\"id\":\"org.kevinlworthington.lginputhook\",\"ipkUrl\":\"/tmp/org.kevinlworthington.lginputhook_<version>_all.ipk\",\"subscribe\":true}'"
 ```
 
 (Press Ctrl-C once it reports `installed`.)
