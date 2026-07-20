@@ -425,3 +425,5 @@ var EXT_KEYMAP = {
     1238: 'LGE_MRCU_UPDATE_FAIL',
     1264: 'LGE_INPUT_FIRST/LGE_INPUT_PRINT/LGE_INPUT_CHECK/LGE_INPUT_LAST'
 };
+
+if (typeof module !== 'undefined') module.exports = EXT_KEYMAP;

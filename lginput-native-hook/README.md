@@ -90,6 +90,14 @@ Press buttons and watch the log:
 tail -f /tmp/lginput-hook-native.log
 ```
 
+The Mahta app uses the hook's `capture_v2` support for Identify. It writes a
+short-lived request to the root-owned
+`/home/root/.config/lginputhook/capture-request`; the hook accepts only a
+root-owned regular file opened with nonblocking, no-follow semantics. It
+swallows the next key-down and matching repeats/key-up, logs
+`CAPTURE token=<token> code=<code>`, and removes the request. This does not edit
+`keybinds.json`.
+
 ### Finding app IDs
 ```bash
 luna-send -n 1 'luna://com.webos.applicationManager/listApps' '{}' | grep -o '"id":"[^"]*"\|"title":"[^"]*"' | paste - -

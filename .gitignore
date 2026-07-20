@@ -1,6 +1,7 @@
 *.so
 *.ipk
 *.zip
+.DS_Store
 /install.sh
 /uninstall.sh
 pkg/

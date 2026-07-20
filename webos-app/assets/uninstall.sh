@@ -8,6 +8,9 @@ HOOK_SO="/home/root/lginput-hook.so"
 INIT_SCRIPT="/var/lib/webosbrew/init.d/lginput-native-hook"
 ENV_FILE="/var/systemd/system/env/lginput2.env"
 CONFIG_DIR="/home/root/.config/lginputhook"
+CAPABILITY_FILE="$CONFIG_DIR/hook-capabilities"
+CAPTURE_FILE="$CONFIG_DIR/capture-request"
+LEGACY_CAPTURE_FILE="/tmp/lginput-hook-capture"
 
 echo "[lginput-native-hook] Uninstalling..."
 
@@ -34,6 +37,12 @@ if [ -f "$HOOK_SO" ]; then
 else
     echo "[lginput-native-hook] Not found (skipping): $HOOK_SO"
 fi
+
+if [ -f "$CAPABILITY_FILE" ]; then
+    rm -f "$CAPABILITY_FILE"
+    echo "[lginput-native-hook] Removed: $CAPABILITY_FILE"
+fi
+rm -f "$CAPTURE_FILE" "$LEGACY_CAPTURE_FILE"
 
 # --- Offer to remove config ---
 if [ -f "$CONFIG_DIR/keybinds.json" ]; then

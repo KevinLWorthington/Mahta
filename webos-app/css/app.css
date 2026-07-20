@@ -13,6 +13,7 @@ html, body {
 }
 
 button { font: inherit; }
+input { font: inherit; }
 
 .focusable { outline: none; cursor: pointer; }
 
@@ -132,6 +133,8 @@ h3 { font-size: 26px; margin: 24px 0 12px; color: #c8ccd2; }
 .btn.primary:focus { border-color: #fff; }
 .btn.danger { background: #5a1620; }
 .btn.danger:focus { border-color: #ff8a8a; }
+.btn.selected { border-color: #4cd97b; background: #214332; color: #fff; }
+.profile-row { margin: -10px 0 24px; }
 
 .output-box {
     background: #0d0f12;
@@ -249,6 +252,25 @@ h3 { font-size: 26px; margin: 24px 0 12px; color: #c8ccd2; }
 
 /* ---------- lists ---------- */
 
+.search-field {
+    display: block;
+    width: 100%;
+    max-width: 760px;
+    height: 64px;
+    margin-top: 20px;
+    padding: 0 20px;
+    color: #e8eaed;
+    background: #101318;
+    border: 3px solid #3b424d;
+    border-radius: 8px;
+    font-size: 23px;
+}
+
+.search-field::placeholder { color: #8f969f; }
+.search-field:focus { border-color: #d4145a; background: #171b21; }
+.searchable-list { min-height: 76px; }
+.empty-search-result { color: #9aa0a6; font-size: 21px; margin-top: 24px; }
+
 .button-list { max-width: 1200px; margin-top: 24px; }
 
 .list-row {
@@ -297,6 +319,7 @@ h3 { font-size: 26px; margin: 24px 0 12px; color: #c8ccd2; }
 }
 
 .modal p { margin-bottom: 16px; line-height: 1.45; }
+.modal .search-field { width: 100%; margin-top: 8px; }
 
 .modal-actions { display: flex; gap: 18px; margin-top: 28px; flex-wrap: wrap; }
 

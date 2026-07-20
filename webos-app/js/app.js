@@ -7,6 +7,7 @@ var LOG_PATH = '/tmp/lginput-hook-native.log';
 var HOOK_SO = '/home/root/lginput-hook.so';
 var ENV_FILE = '/var/systemd/system/env/lginput2.env';
 var INIT_SCRIPT = '/var/lib/webosbrew/init.d/lginput-native-hook';
+var CAPABILITY_FILE = '/home/root/.config/lginputhook/hook-capabilities';
 /* Directory this app is installed in (index.html lives at its root). */
 var APP_DIR = decodeURIComponent(location.pathname).replace(/\/[^\/]*$/, '');
 
@@ -19,8 +20,11 @@ var state = {
     status: null,              // {so, env, init, run, cfg}
     apps: null,                // [{id, title}]
     busy: false,
-    showProtected: false       // reveal nav/OK/Back/Power buttons (off each launch)
+    showProtected: false,      // reveal nav/OK/Back/Power buttons (off each launch)
+    buttonSearch: '',
+    appSearch: ''
 };
+var captureCoordinator = createCaptureCoordinator();
 
 /* ================= tiny DOM helpers ================= */
 
@@ -47,6 +51,39 @@ function btn(label, onActivate, cls) {
     return b;
 }
 
+function searchControl(label, value, onSearch) {
+    var input = el('input', {
+        'class': 'search-field focusable',
+        type: 'search',
+        placeholder: label,
+        'aria-label': label,
+        autocomplete: 'off',
+        autocapitalize: 'off',
+        spellcheck: 'false',
+        tabindex: '-1'
+    });
+    input.value = value || '';
+    input.addEventListener('input', function () { onSearch(input.value); });
+    return input;
+}
+
+function setEmptySearchState(node, count, query, itemName) {
+    node.style.display = count ? 'none' : 'block';
+    node.textContent = query
+        ? 'No ' + itemName + ' match "' + query + '".'
+        : 'No ' + itemName + ' are available.';
+}
+
+function applySearch(rows, query, empty, itemName) {
+    var count = 0;
+    rows.forEach(function (row) {
+        var visible = matchesSearch(query, row.values);
+        row.node.style.display = visible ? '' : 'none';
+        if (visible) count++;
+    });
+    setEmptySearchState(empty, count, query, itemName);
+}
+
 /* Remote-navigable checkbox. */
 function toggleControl(label, checked, onToggle) {
     var box = el('div', {
@@ -65,6 +102,24 @@ function setShowProtected(v) {
     renderView();
     var t = $('.toggle');   // keep focus on the toggle across the re-render
     if (t) setFocus(t);
+}
+
+function setRemoteProfile(id) {
+    setActiveRemoteProfile(id);
+    renderView();
+    var selected = $('.profile-option.selected');
+    if (selected) setFocus(selected);
+}
+
+function remoteProfileControl() {
+    var row = el('div', { 'class': 'profile-row action-row' });
+    remoteProfiles().forEach(function (profile) {
+        var selected = activeRemoteProfileId() === profile.id;
+        var b = btn(profile.label, function () { setRemoteProfile(profile.id); }, selected ? 'selected profile-option' : 'profile-option');
+        b.setAttribute('aria-pressed', selected ? 'true' : 'false');
+        row.appendChild(b);
+    });
+    return row;
 }
 
 function toast(msg, isError) {
@@ -287,7 +342,8 @@ var STATUS_CMD =
     'S3=no; [ -f ' + INIT_SCRIPT + ' ] && S3=yes; ' +
     'S4=no; pgrep lginput2 >/dev/null 2>&1 && S4=yes; ' +
     'S5=no; [ -f ' + CONFIG_PATH + ' ] && S5=yes; ' +
-    'echo "so=$S1 env=$S2 init=$S3 run=$S4 cfg=$S5"';
+    'S6=no; grep -qw capture_v2 ' + CAPABILITY_FILE + ' 2>/dev/null && S6=yes; ' +
+    'echo "so=$S1 env=$S2 init=$S3 run=$S4 cfg=$S5 capture=$S6"';
 
 function loadStatus() {
     return Luna.exec(STATUS_CMD).then(function (r) {
@@ -312,6 +368,11 @@ function hookInstalled() {
 function hookActive() {
     var s = state.status;
     return s && s.so && s.env && s.run;
+}
+
+function hookCaptureSupported() {
+    var s = state.status;
+    return !!(s && s.capture);
 }
 
 function runScript(label, command, outputBox) {
@@ -423,7 +484,8 @@ function renderStatusView(c) {
         statusRow('Active (LD_PRELOAD on lginput2)', !!s.env, 'Active', 'Inactive'),
         statusRow('Boot persistence (init.d)', !!s.init, 'Enabled', 'Not set'),
         statusRow('lginput2 daemon', !!s.run, 'Running', 'Not running'),
-        statusRow('Keybinds config', !!s.cfg, 'Present', 'Missing')
+        statusRow('Keybinds config', !!s.cfg, 'Present', 'Missing'),
+        statusRow('Safe key capture', !!s.capture, 'Supported', 'Reinstall hook')
     ]);
     c.appendChild(grid);
 
@@ -483,6 +545,7 @@ function svgEl(tag, attrs) {
 
 function renderRemoteView(c) {
     c.appendChild(el('h1', { text: 'Remote' }));
+    c.appendChild(remoteProfileControl());
     var wrap = el('div', { 'class': 'remote-wrap' });
 
     var legend = el('div', { 'class': 'legend' }, [
@@ -492,12 +555,12 @@ function renderRemoteView(c) {
         el('p', { 'class': 'hint', text: 'Select a button to change what it does. PTR SHOW / PTR HIDE are the pointer/cursor events.' })
     ]);
 
-    var svg = svgEl('svg', { viewBox: REMOTE_VIEWBOX, 'class': 'remote-svg', preserveAspectRatio: 'xMidYMin meet' });
+    var svg = svgEl('svg', { viewBox: remoteViewBox(), 'class': 'remote-svg', preserveAspectRatio: 'xMidYMin meet' });
 
     // remote body
     svg.appendChild(svgEl('rect', { x: 8, y: 8, width: 344, height: 1134, rx: 60, 'class': 'remote-body' }));
 
-    REMOTE_LAYOUT.forEach(function (item) {
+    remoteLayout().forEach(function (item) {
         if (isProtected(item.code) && !state.showProtected) return;
         var g = svgEl('g', { 'class': 'rbtn focusable ' + (item.cls || ''), tabindex: '-1', 'data-code': item.code });
         var cx = item.x, cy = item.y;
@@ -571,75 +634,144 @@ function renderButtonsView(c) {
     head.appendChild(btn('Identify a button (press it on the remote)', openDetector, 'primary'));
     c.appendChild(head);
 
-    var list = el('div', { 'class': 'button-list' });
-
     // known keys plus any extra codes already present in the config
-    var codes = KEYMAP.map(function (k) { return k.code; });
+    var codes = allKnownRemoteCodes();
     Object.keys(state.config).forEach(function (k) {
         if (/^\d+$/.test(k) && codes.indexOf(parseInt(k, 10)) === -1) codes.push(parseInt(k, 10));
     });
 
-    var hidden = 0;
+    var list = el('div', { 'class': 'button-list searchable-list' });
+    var empty = el('p', { 'class': 'empty-search-result' });
+    var rows = [];
+    var hidden = codes.filter(function (code) {
+        return isProtected(code) && !state.showProtected;
+    }).length;
+
     codes.forEach(function (code) {
-        if (isProtected(code) && !state.showProtected) { hidden++; return; }
+        if (isProtected(code) && !state.showProtected) return;
         var k = keyByCode(code);
         var b = bindingFor(code);
+        var name = k ? k.name : 'Unknown button';
+        var key = k ? k.key : '';
+        var binding = describeBinding(b);
         var row = el('div', { 'class': 'list-row focusable', tabindex: '-1' }, [
-            el('span', { 'class': 'cell name', text: k ? k.name : 'Unknown button' }),
+            el('span', { 'class': 'cell name', text: name }),
             el('span', { 'class': 'cell mono code', text: String(code) }),
-            el('span', { 'class': 'cell mono key', text: k ? k.key : '—' }),
-            el('span', { 'class': 'cell mapping ' + bindingClass(b), text: describeBinding(b) })
+            el('span', { 'class': 'cell mono key', text: key || '—' }),
+            el('span', { 'class': 'cell mapping ' + bindingClass(b), text: binding })
         ]);
         row.addEventListener('click', function () { openMappingEditor(code); });
         list.appendChild(row);
+        rows.push({ node: row, values: [name, code, key, binding] });
     });
+
+    c.appendChild(searchControl('Search buttons, key names, or codes', state.buttonSearch, function (query) {
+        state.buttonSearch = query;
+        applySearch(rows, query, empty, 'buttons');
+    }));
     c.appendChild(list);
+    c.appendChild(empty);
+    applySearch(rows, state.buttonSearch, empty, 'buttons');
     if (hidden) {
         c.appendChild(el('p', { 'class': 'hint', text: hidden + ' protected button(s) (navigation, OK, Back, Power) are hidden. Enable “Show navigation, OK, Back & Power buttons” on the Remote screen to edit them.' }));
     }
 }
 
-/* live key-code detector: tails the hook log for new KEY lines */
+/* live key-code detector: asks capture_v2 hook to swallow one key press */
 function openDetector() {
     if (!hookActive()) {
         toast('The hook must be installed and active to detect key codes.', true);
         return;
     }
-    var seen = el('div', { 'class': 'detected-keys', text: 'Waiting for a button press…' });
-    var startLine = 0;
-    var timer = null;
+    if (!hookCaptureSupported()) {
+        var unsupported;
+        unsupported = openModal('Reinstall hook for safe Identify', [
+            el('p', { text: 'This installed hook does not advertise safe one-button capture. Reinstall the hook from Status & Install before using Identify.' }),
+            el('p', { 'class': 'hint', text: 'Mahta will not temporarily disable your keybinds config to identify buttons.' }),
+            el('div', { 'class': 'modal-actions' }, [
+                btn('Close', function () { closeModal(unsupported); })
+            ])
+        ]);
+        return;
+    }
+    if (captureCoordinator.isBusy()) {
+        toast('The previous capture is still closing. Please wait.', true);
+        return;
+    }
+
+    var token = makeCaptureToken();
+    var instruction = el('p', { text: captureInstruction('preparing') });
+    var seen = el('div', { 'class': 'detected-keys', text: 'Preparing safe capture…' });
+    var session = null;
+    var closed = false;
     var overlay = openModal('Identify a button', [
-        el('p', { text: 'Press any button on the remote. Its code will appear at the top of the list below.' }),
+        instruction,
         seen,
         el('div', { 'class': 'modal-actions' }, [
             btn('Close', function () { closeModal(overlay); })
         ])
-    ], function () { clearInterval(timer); });
+    ], cleanupCapture);
 
-    Luna.exec("wc -l < '" + LOG_PATH + "' 2>/dev/null || echo 0").then(function (r) {
-        startLine = parseInt(r.stdout, 10) || 0;
-        timer = setInterval(function () {
-            Luna.exec("tail -n +" + (startLine + 1) + " '" + LOG_PATH + "' 2>/dev/null | grep 'KEY code=' | tail -n 12").then(function (r2) {
-                if (!r2.ok) return;
-                var codes = [];
-                (r2.stdout.match(/KEY code=(\d+)/g) || []).forEach(function (m) {
-                    var code = parseInt(m.replace('KEY code=', ''), 10);
-                    if (codes[codes.length - 1] !== code) codes.push(code);
-                });
-                if (!codes.length) return;
-                seen.innerHTML = '';
-                codes.slice(-6).reverse().forEach(function (code) {
-                    var k = keyByCode(code);
-                    var row = el('div', { 'class': 'detected-row focusable', tabindex: '-1', text: (k ? k.name : 'Unknown') + ' — code ' + code });
-                    row.addEventListener('click', function () {
-                        closeModal(overlay);
-                        openMappingEditor(code);
-                    });
-                    seen.appendChild(row);
-                });
+    function cleanupCapture() {
+        closed = true;
+        if (session) session.stop();
+    }
+
+    function showCaptureError(message) {
+        instruction.textContent = captureInstruction('inactive');
+        seen.textContent = message;
+    }
+
+    function showCapturedCode(code) {
+        instruction.textContent = captureInstruction('captured');
+        seen.innerHTML = '';
+        var k = keyByCode(code);
+        var row = el('div', {
+            'class': 'detected-row focusable',
+            tabindex: '-1',
+            text: (k ? k.name : 'Unknown') + ' — code ' + code
+        });
+        row.addEventListener('click', function () {
+            closeModal(overlay);
+            openMappingEditor(code);
+        });
+        seen.appendChild(row);
+        focusFirst(overlay);
+    }
+
+    var request = buildCaptureRequest(token, captureNowSeconds(), CAPTURE_TIMEOUT_SECONDS);
+    session = captureCoordinator.start({
+        writeRequest: function () {
+            return Luna.writeFile(CAPTURE_REQUEST_PATH, request);
+        },
+        removeRequest: function () {
+            return Luna.exec(buildCaptureCleanupCommand(token));
+        },
+        poll: function () {
+            return Luna.exec("tail -n 80 '" + LOG_PATH + "' 2>/dev/null | grep 'CAPTURE token='").then(function (r) {
+                return r.ok ? parseCaptureLog(r.stdout, token) : null;
             });
-        }, 1000);
+        },
+        onReady: function () {
+            instruction.textContent = captureInstruction('ready');
+            seen.textContent = 'Waiting for one button press…';
+        },
+        onCaptured: showCapturedCode,
+        onError: function (message) {
+            showCaptureError('Could not start safe capture: ' + message);
+        },
+        onTimeout: function () {
+            showCaptureError('No button was captured. Close and try again.');
+        },
+        pollIntervalMs: 400,
+        timeoutMs: (CAPTURE_TIMEOUT_SECONDS + 2) * 1000
     });
+    if (!session) {
+        closeModal(overlay);
+        toast('The previous capture is still closing. Please wait.', true);
+        return;
+    }
+    if (closed) session.stop();
 }
 
 /* ---------- apps view ---------- */
@@ -655,7 +787,10 @@ function renderAppsView(c) {
         return;
     }
     c.appendChild(el('p', { 'class': 'hint', text: 'These app IDs can be assigned to buttons. Select one to test-launch it.' }));
-    var list = el('div', { 'class': 'button-list' });
+    var list = el('div', { 'class': 'button-list searchable-list' });
+    var empty = el('p', { 'class': 'empty-search-result' });
+    var rows = [];
+
     state.apps.forEach(function (a) {
         var row = el('div', { 'class': 'list-row focusable' + (a.visible ? '' : ' dim'), tabindex: '-1' }, [
             el('span', { 'class': 'cell name', text: a.title }),
@@ -666,8 +801,16 @@ function renderAppsView(c) {
                 .then(function (r) { toast(r.ok ? 'Launched ' + a.title : 'Launch failed', !r.ok); });
         });
         list.appendChild(row);
+        rows.push({ node: row, values: [a.title, a.id] });
     });
+
+    c.appendChild(searchControl('Search installed apps or app IDs', state.appSearch, function (query) {
+        state.appSearch = query;
+        applySearch(rows, query, empty, 'apps');
+    }));
     c.appendChild(list);
+    c.appendChild(empty);
+    applySearch(rows, state.appSearch, empty, 'apps');
 }
 
 /* ---------- mapping editor ---------- */
@@ -750,17 +893,28 @@ function confirmCritical(name, onConfirm) {
 function openKeyPicker(forName, onPick) {
     var overlay;
     var list = el('div', { 'class': 'option-list' });
-    KEYMAP.filter(function (k) { return !k.virtual; }).forEach(function (k) {
+    var empty = el('p', { 'class': 'empty-search-result' });
+    var keys = allKnownRemoteKeys().filter(function (k) { return !k.virtual; });
+    var rows = [];
+
+    keys.forEach(function (k) {
         var row = optionRow(k.name, k.key + ' — code ' + k.code, false, function () {
             closeModal(overlay);
             onPick(k.code);
         });
         list.appendChild(row);
+        rows.push({ node: row, values: [k.name, k.key, k.code] });
     });
+
     overlay = openModal('Send which key when "' + forName + '" is pressed?', [
+        searchControl('Search buttons, key names, or codes', '', function (query) {
+            applySearch(rows, query, empty, 'buttons');
+        }),
         list,
+        empty,
         el('div', { 'class': 'modal-actions' }, [btn('Cancel', function () { closeModal(overlay); })])
     ]);
+    applySearch(rows, '', empty, 'buttons');
 }
 
 function openAppPicker(forName, onPick) {
@@ -772,14 +926,25 @@ function openAppPicker(forName, onPick) {
         box.innerHTML = '';
         box.appendChild(el('h2', { text: 'Launch which app from "' + forName + '"?' }));
         var list = el('div', { 'class': 'option-list' });
+        var empty = el('p', { 'class': 'empty-search-result' });
+        var rows = [];
+
         state.apps.forEach(function (a) {
-            list.appendChild(optionRow(a.title, a.id, false, function () {
+            var row = optionRow(a.title, a.id, false, function () {
                 closeModal(overlay);
                 onPick(a.id);
-            }));
+            });
+            list.appendChild(row);
+            rows.push({ node: row, values: [a.title, a.id] });
         });
+
+        box.appendChild(searchControl('Search installed apps or app IDs', '', function (query) {
+            applySearch(rows, query, empty, 'apps');
+        }));
         box.appendChild(list);
+        box.appendChild(empty);
         box.appendChild(el('div', { 'class': 'modal-actions' }, [btn('Cancel', function () { closeModal(overlay); })]));
+        applySearch(rows, '', empty, 'apps');
         focusFirst(overlay);
     }, function (e) {
         var box = overlay.querySelector('.modal');

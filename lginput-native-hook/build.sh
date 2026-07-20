@@ -1,15 +1,24 @@
 #!/bin/bash
 # build.sh — builds install.sh and uninstall.sh for lginput-native-hook
 # Run from the project directory in WSL
-# Requires: arm-linux-gnueabi-gcc, base64
+# Requires: arm-linux-gnueabi-gcc or zig, plus base64
 
 set -e
 
 echo "[*] Compiling lginput-hook.so..."
-arm-linux-gnueabi-gcc -shared -fPIC -O2 \
-    -o lginput-hook.so lginput-hook.c \
-    -nostartfiles -march=armv7-a \
-    -Wl,--dynamic-linker=/lib/ld-linux.so.3
+if command -v arm-linux-gnueabi-gcc >/dev/null 2>&1; then
+    arm-linux-gnueabi-gcc -shared -fPIC -O2 \
+        -o lginput-hook.so lginput-hook.c \
+        -nostartfiles -march=armv7-a \
+        -Wl,--dynamic-linker=/lib/ld-linux.so.3
+elif command -v zig >/dev/null 2>&1; then
+    zig cc -target arm-linux-gnueabi.2.4 -shared -fPIC -O2 \
+        -Wl,--strip-all \
+        -o lginput-hook.so lginput-hook.c
+else
+    echo "[!] ERROR: install arm-linux-gnueabi-gcc or zig to build lginput-hook.so" >&2
+    exit 1
+fi
 
 echo "[*] Verifying GLIBC dependencies..."
 GLIBC=$(objdump -p lginput-hook.so | grep GLIBC | grep -v "2\.4" || true)
@@ -30,6 +39,7 @@ cat > install.sh << 'INSTALLEOF'
 #   - Installs lginput-hook.so to /home/root/
 #   - Installs a boot startup script to /var/lib/webosbrew/init.d/
 #   - Creates a default keybinds config if none exists
+#   - Writes hook capability metadata for safe one-button capture
 #   - Activates the hook immediately (no reboot needed)
 #
 # Requires: root access, Homebrew Channel installed
@@ -40,6 +50,9 @@ HOOK_SO="/home/root/lginput-hook.so"
 INIT_SCRIPT="/var/lib/webosbrew/init.d/lginput-native-hook"
 CONFIG_DIR="/home/root/.config/lginputhook"
 CONFIG_FILE="$CONFIG_DIR/keybinds.json"
+CAPABILITY_FILE="$CONFIG_DIR/hook-capabilities"
+CAPTURE_FILE="$CONFIG_DIR/capture-request"
+LEGACY_CAPTURE_FILE="/tmp/lginput-hook-capture"
 ENV_DIR="/var/systemd/system/env"
 ENV_FILE="$ENV_DIR/lginput2.env"
 
@@ -85,6 +98,8 @@ echo "[lginput-native-hook] Installed: $INIT_SCRIPT"
 
 # --- Create default config if none exists ---
 mkdir -p "$CONFIG_DIR"
+chown 0:0 "$CONFIG_DIR"
+chmod 700 "$CONFIG_DIR"
 if [ ! -f "$CONFIG_FILE" ]; then
     cat > "$CONFIG_FILE" << 'CONFIGEOF'
 {
@@ -95,6 +110,18 @@ CONFIGEOF
 else
     echo "[lginput-native-hook] Existing config preserved: $CONFIG_FILE"
 fi
+chown 0:0 "$CONFIG_FILE"
+chmod 600 "$CONFIG_FILE"
+
+# Remove pending requests from this or the legacy capture protocol.
+rm -f "$CAPTURE_FILE" "$LEGACY_CAPTURE_FILE"
+
+cat > "$CAPABILITY_FILE" << 'CAPABILITYEOF'
+capture_v2
+CAPABILITYEOF
+chown 0:0 "$CAPABILITY_FILE"
+chmod 600 "$CAPABILITY_FILE"
+echo "[lginput-native-hook] Wrote capabilities: $CAPABILITY_FILE"
 
 # --- Activate immediately ---
 echo "[lginput-native-hook] Activating hook..."
@@ -125,8 +152,8 @@ exit 0
 PAYLOAD_START
 INSTALLEOF
 
-# Append the .so as base64
-base64 lginput-hook.so >> install.sh
+# Append the .so as base64. Input redirection works on GNU and BSD base64.
+base64 < lginput-hook.so >> install.sh
 chmod +x install.sh
 echo "[+] Built: install.sh ($(wc -c < install.sh) bytes)"
 
@@ -142,6 +169,9 @@ HOOK_SO="/home/root/lginput-hook.so"
 INIT_SCRIPT="/var/lib/webosbrew/init.d/lginput-native-hook"
 ENV_FILE="/var/systemd/system/env/lginput2.env"
 CONFIG_DIR="/home/root/.config/lginputhook"
+CAPABILITY_FILE="$CONFIG_DIR/hook-capabilities"
+CAPTURE_FILE="$CONFIG_DIR/capture-request"
+LEGACY_CAPTURE_FILE="/tmp/lginput-hook-capture"
 
 echo "[lginput-native-hook] Uninstalling..."
 
@@ -168,6 +198,12 @@ if [ -f "$HOOK_SO" ]; then
 else
     echo "[lginput-native-hook] Not found (skipping): $HOOK_SO"
 fi
+
+if [ -f "$CAPABILITY_FILE" ]; then
+    rm -f "$CAPABILITY_FILE"
+    echo "[lginput-native-hook] Removed: $CAPABILITY_FILE"
+fi
+rm -f "$CAPTURE_FILE" "$LEGACY_CAPTURE_FILE"
 
 # --- Offer to remove config ---
 if [ -f "$CONFIG_DIR/keybinds.json" ]; then

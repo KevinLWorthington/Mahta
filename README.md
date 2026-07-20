@@ -11,8 +11,8 @@ For detailed usage instructions, see the [**Using the App**](#using-the-app) sec
 
 - [**Status & Install**](#status--install) shows whether the hook library, LD_PRELOAD activation,
   boot persistence, and `lginput2` are healthy.
-- [**Remote**](#remote) shows an interactive, on-screen representation of a Magic Remote.
-- [**Button List**](#button-list) shows every key based on [this list](https://gist.githubusercontent.com/Simon34545/fc5c91e0456789dd7a56a947c1148939/raw/) and my limited testing.
+- [**Remote**](#remote) shows an interactive, on-screen representation of a Magic Remote, with profiles for MR23 and C5 Europe / MR25GA remotes.
+- [**Button List**](#button-list) shows the complete searchable LG key catalog independently of the selected remote profile, based on [this list](https://gist.githubusercontent.com/Simon34545/fc5c91e0456789dd7a56a947c1148939/raw/) and my limited testing.
 - [**Apps**](#apps) shows all apps installed on the TV.
 
 ## Requirements
@@ -74,12 +74,14 @@ The app then appears in the TV's launcher bar as **Mahta**.
 ![Remote unhidden buttons](/screenshots/004.png)
 ![Remap a button](/screenshots/005.png)
 ### Button List
-- Show the entire list of known buttons. Click "Identify a button..." to check what a button on your remote does.
+- Show the entire list of known LG buttons for every remote profile. Click "Identify a button..." to safely capture one button press without changing your keybinds config.
+- Search by button name, Linux key name, or numeric code.
 - Select a button to remap it.
 ![Button list](/screenshots/006.png)
 ![ID a button](/screenshots/007.png)
 ### Apps
 - Shows a list of all apps installed on the TV. Select one to launch it.
+- Search by app title or application ID.
 ![App list](/screenshots/008.png)
 ![Selected app](/screenshots/009.png)
 
