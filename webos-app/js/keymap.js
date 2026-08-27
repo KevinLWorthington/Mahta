@@ -44,8 +44,6 @@ var KEYMAP = [
     { code: 1043, name: 'LG Channels',    key: 'KEY_LGCHANNELS' },
     { code: 1086, name: 'Alexa',          key: 'KEY_ALEXAVOICE' },
     { code: 1107, name: 'Sling TV',       key: 'KEY_SLINGTV' },
-    { code: 1198, name: 'Show Pointer',   key: 'KEY_CURSOR_SHOW',   virtual: true },
-    { code: 1199, name: 'Hide Pointer',   key: 'KEY_CURSOR_HIDE',   virtual: true },
     { code: 116,  name: 'Power',          key: 'KEY_POWER',         critical: true },
     { code: 174,  name: 'Exit',           key: 'KEY_EXIT' },
     { code: 207,  name: 'Play',           key: 'KEY_PLAY' },
@@ -155,10 +153,7 @@ var REMOTE_LAYOUT = [
     { code: 1042, x: 96,  y: 974,  shape: 'pill', w: 132, h: 44, label: 'DISNEY+', small: true },
     { code: 1043, x: 252, y: 974,  shape: 'pill', w: 132, h: 44, label: 'LG CH', small: true },
     { code: 1107, x: 96, y: 1032, shape: 'pill', w: 132, h: 44, label: 'SLING', small: true },
-    { code: 1086, x: 252,  y: 1032, shape: 'pill', w: 132, h: 44, label: 'ALEXA', small: true },
-
-    { code: 1198, x: 96,  y: 1096, shape: 'pill', w: 132, h: 40, label: 'PTR SHOW', small: true, cls: 'virt' },
-    { code: 1199, x: 252, y: 1096, shape: 'pill', w: 132, h: 40, label: 'PTR HIDE', small: true, cls: 'virt' }
+    { code: 1086, x: 252,  y: 1032, shape: 'pill', w: 132, h: 44, label: 'ALEXA', small: true }
 ];
 
 var REMOTE_VIEWBOX = '0 0 360 1150';

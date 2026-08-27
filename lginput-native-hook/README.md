@@ -69,8 +69,8 @@ Example keybinds.json:
     "1037": {"action": "launch", "id": "youtube.leanback.v4"},
     "1038": {"action": "launch", "id": "io.strem.tv"},
     "1042": {"action": "replace", "keycode": 1038},
-    "1198": {"action": "disable"}, #Cursor show ID
-    "1199": {"action": "disable"}, #Cursor hide ID
+    "disable_pointer": true,
+    "disable_scroll": true,
     "reload": "2"
 }
 ```
@@ -82,6 +82,18 @@ Example keybinds.json:
 | `disable` | Swallows the button press; does nothing | — |
 | `replace` | Sends a different key code instead | `"keycode": <id>` |
 | `launch` | Opens a webOS app | `"id": "<app_id>"` |
+
+### Cursor & scroll wheel
+
+Two optional top-level flags control pointer and scroll suppression. **Both
+default to off** — a fresh install changes nothing until you set them (or toggle
+them in the Mahta app). They are independent, so the cursor can be disabled
+while the scroll wheel keeps working, or vice versa.
+
+| Flag | Effect |
+|------|--------|
+| `"disable_pointer": true` | Drops cursor motion (`REL_X`/`REL_Y`) — the pointer stops moving |
+| `"disable_scroll": true`  | Drops the scroll wheel (`REL_WHEEL`/`REL_HWHEEL`) |
 
 ### Finding button codes
 
@@ -132,7 +144,9 @@ This produces `install.sh` and `uninstall.sh`.
 writes them to `/dev/uinput`. This hook intercepts those `write()` calls via
 `LD_PRELOAD`, inspecting each input event before it reaches the kernel.
 
-- `EV_REL` events (pointer movement) are dropped to suppress cursor movement
+- `EV_REL` events are passed through by default; cursor motion (`REL_X`/`REL_Y`)
+  and the scroll wheel (`REL_WHEEL`) are dropped only when the `disable_pointer`
+  / `disable_scroll` config flags are set
 - `EV_KEY` events are matched against the keybinds config for disable/replace/launch
 - App launches use `fork()` + `execve()` to call `luna-send` directly
 - Uses only raw ARM syscalls
