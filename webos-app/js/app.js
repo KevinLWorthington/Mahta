@@ -48,11 +48,13 @@ function btn(label, onActivate, cls) {
 }
 
 /* Remote-navigable checkbox. */
-function toggleControl(label, checked, onToggle) {
-    var box = el('div', {
+function toggleControl(label, checked, onToggle, key) {
+    var attrs = {
         'class': 'toggle focusable' + (checked ? ' on' : ''),
         tabindex: '-1', role: 'checkbox', 'aria-checked': checked ? 'true' : 'false'
-    }, [
+    };
+    if (key) attrs['data-toggle'] = key;
+    var box = el('div', attrs, [
         el('span', { 'class': 'toggle-box', text: checked ? '✓' : '' }),
         el('span', { 'class': 'toggle-label', text: label })
     ]);
@@ -65,6 +67,22 @@ function setShowProtected(v) {
     renderView();
     var t = $('.toggle');   // keep focus on the toggle across the re-render
     if (t) setFocus(t);
+}
+
+/*
+ * A checkbox bound to a top-level boolean flag in the keybinds config
+ * (e.g. disable_pointer / disable_scroll). Saving is live.
+ */
+function configToggle(label, cfgKey) {
+    return toggleControl(label, !!state.config[cfgKey], function () {
+        if (state.config[cfgKey]) delete state.config[cfgKey];
+        else state.config[cfgKey] = true;
+        saveConfig().then(function () {
+            renderView();
+            var t = $('[data-toggle="' + cfgKey + '"]');
+            if (t) setFocus(t);
+        });
+    }, cfgKey);
 }
 
 function toast(msg, isError) {
@@ -244,6 +262,9 @@ function saveConfig() {
         .filter(function (k) { return /^\d+$/.test(k); })
         .sort(function (a, b) { return a - b; })
         .forEach(function (k) { out[k] = state.config[k]; });
+    // Preserve top-level runtime flags (pointer/scroll suppression).
+    if (state.config.disable_pointer) out.disable_pointer = true;
+    if (state.config.disable_scroll) out.disable_scroll = true;
     // A changed reload value changes the file size, which triggers the hook's auto-reload.
     var n = parseInt(state.config.reload, 10);
     out.reload = String(isNaN(n) ? 1 : n + 1);
@@ -374,6 +395,10 @@ function switchView(id) {
     state.view = id;
     renderSidebar();
     renderView();
+    // Keep focus on the selected nav item — renderView's fallback would
+    // otherwise snap it to the first focusable (Status & Install).
+    var activeNav = $('#sidebar-nav .nav-item.active');
+    if (activeNav) setFocus(activeNav);
 }
 
 function renderSidebar() {
@@ -489,7 +514,7 @@ function renderRemoteView(c) {
         el('div', { 'class': 'legend-item', html: '<span class="dot map-disable"></span> Disabled' }),
         el('div', { 'class': 'legend-item', html: '<span class="dot map-replace"></span> Remapped to a key' }),
         el('div', { 'class': 'legend-item', html: '<span class="dot map-launch"></span> Launches an app' }),
-        el('p', { 'class': 'hint', text: 'Select a button to change what it does. PTR SHOW / PTR HIDE are the pointer/cursor events.' })
+        el('p', { 'class': 'hint', text: 'Select a button to change what it does. Use the Cursor & scroll wheel options to disable the pointer or wheel.' })
     ]);
 
     var svg = svgEl('svg', { viewBox: REMOTE_VIEWBOX, 'class': 'remote-svg', preserveAspectRatio: 'xMidYMin meet' });
@@ -542,8 +567,14 @@ function renderRemoteView(c) {
         setShowProtected(!state.showProtected);
     });
 
+    var pointerCard = el('div', { 'class': 'settings-card' }, [
+        el('div', { 'class': 'settings-title', text: 'Cursor & scroll wheel' }),
+        configToggle('Disable the on-screen pointer (cursor)', 'disable_pointer'),
+        configToggle('Disable the scroll wheel', 'disable_scroll')
+    ]);
+
     var detail = el('div', { 'class': 'remote-detail', id: 'remote-detail' });
-    var side = el('div', { 'class': 'remote-side' }, [toggle, legend, detail]);
+    var side = el('div', { 'class': 'remote-side' }, [toggle, pointerCard, legend, detail]);
 
     wrap.appendChild(svg);
     wrap.appendChild(side);
@@ -559,7 +590,7 @@ function showRemoteDetail(code) {
     d.appendChild(el('h3', { text: k ? k.name : 'Code ' + code }));
     d.appendChild(el('p', { 'class': 'mono', text: (k ? k.key + ' — ' : '') + 'code ' + code }));
     d.appendChild(el('p', { 'class': 'binding-desc ' + bindingClass(b), text: describeBinding(b) }));
-    if (k && k.critical) d.appendChild(el('p', { 'class': 'hint', text: '⚠ Needed to navigate the TV — remap with care.' }));
+    if (k && k.critical) d.appendChild(el('p', { 'class': 'hint', text: '⚠ Needed to navigate the TV; remap with care.' }));
 }
 
 /* ---------- buttons list view ---------- */

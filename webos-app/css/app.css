@@ -225,6 +225,19 @@ h3 { font-size: 26px; margin: 24px 0 12px; color: #c8ccd2; }
 .toggle.on .toggle-box { border-color: #4cd97b; }
 .toggle-label { flex: 1; }
 
+.settings-card {
+    background: #1b1f26;
+    border-radius: 18px;
+    padding: 22px 26px 10px;
+    margin-bottom: 28px;
+}
+
+.settings-title { font-size: 23px; font-weight: 600; color: #fff; margin-bottom: 16px; }
+
+/* nested toggles sit on the darker page color so they read as distinct rows */
+.settings-card .toggle { background: #14171c; }
+.settings-card .toggle:focus { background: #262c36; }
+
 .legend { background: #1b1f26; border-radius: 18px; padding: 24px 28px; margin-bottom: 28px; }
 .legend-item { display: flex; align-items: center; gap: 14px; margin-bottom: 10px; font-size: 22px; }
 
