@@ -421,10 +421,13 @@ ssize_t write(int fd, const void *buf, size_t count) {
         (ev->code == KEY_CURSOR_SHOW || ev->code == KEY_CURSOR_HIDE))
         return (ssize_t)count;
 
-    if (ev->type == EV_KEY && ev->value == 1) {
-        log_int("[hook] KEY code=", (int)ev->code);
+    if (ev->type == EV_KEY) {
+        if (ev->value == 1) log_int("[hook] KEY PRESS code=", (int)ev->code);
+        else if (ev->value == 0) log_int("[hook] KEY RELEASE code=", (int)ev->code);
+        else log_int("[hook] KEY OTHER code=", (int)ev->code);
 
         keybind_t *kb = find_keybind((int)ev->code);
+
         if (kb) {
             if (kb->action == ACTION_DISABLE) {
                 log_int("[hook] DISABLED key=", (int)ev->code);
@@ -433,14 +436,18 @@ ssize_t write(int fd, const void *buf, size_t count) {
             if (kb->action == ACTION_REPLACE) {
                 input_event_t mod = *ev;
                 mod.code = (uint16_t)kb->replace_code;
-                log_int("[hook] REPLACED key=", (int)ev->code);
+                log_int("[hook] REPLACED key=", (int)mod.code);
                 return raw_write(fd, &mod, count);
             }
             if (kb->action == ACTION_LAUNCH) {
                 log_int("[hook] LAUNCH for key=", (int)ev->code);
-                launch_app(kb->app_id);
+                // Only launch on key press and not release
+                if (ev->value == 1) launch_app(kb->app_id);
                 return (ssize_t)count; /* swallow original keypress */
             }
+            
+            log_int("[hook] UNKNOWN key=", (int)ev->code);
+            return (ssize_t)count; /* swallow original keypress */
         }
     }
 
