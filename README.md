@@ -41,6 +41,16 @@ This produces `dist/org.kevinlworthington.lginputhook_<version>_all.ipk`.
 
 ## Installing on the TV
 
+Using the Homebrew Channel:
+
+- Launch the Homebrew Channel on your TV
+- Select the gear icon in the top right
+- Select "Add repository"
+- Enter https://raw.githubusercontent.com/KevinLWorthington/Mahta/main/repo.json and click "ADD REPOSITORY"
+- Navigate back to the main screen of the Homebrew Channel, find and select Mahta and click "INSTALL"
+
+Manual Install:
+
 Download the latest version from [Releases](https://github.com/KevinLWorthington/Mahta/releases/latest)
 or build with instructions above.
 
