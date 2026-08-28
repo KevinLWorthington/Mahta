@@ -6,7 +6,7 @@
       "title": "Mahta",
       "type": "web",
       "version": "0.9.2",
-      "appDescription": "Remap LG Magic Remote Buttons",
+      "description": "Remap LG Magic Remote Buttons",
       "iconUri": "https://raw.githubusercontent.com/KevinLWorthington/lg-native-hook/main/webos-app/largeIcon.png",
       "sourceUrl": "https://github.com/KevinLWorthington/Mahta",
       "rootRequired": true,
