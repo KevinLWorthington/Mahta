@@ -630,7 +630,12 @@ function renderButtonsView(c) {
     }
 }
 
-/* live key-code detector: tails the hook log for new KEY lines */
+/*
+ * live key-code detector: tails the hook log for new key-press lines.
+ * Current hooks log "KEY PRESS code=" / "KEY RELEASE code="; older ones
+ * logged presses only, as "KEY code=". Releases are ignored so each
+ * press shows up once.
+ */
 function openDetector() {
     if (!hookActive()) {
         toast('The hook must be installed and active to detect key codes.', true);
@@ -650,11 +655,11 @@ function openDetector() {
     Luna.exec("wc -l < '" + LOG_PATH + "' 2>/dev/null || echo 0").then(function (r) {
         startLine = parseInt(r.stdout, 10) || 0;
         timer = setInterval(function () {
-            Luna.exec("tail -n +" + (startLine + 1) + " '" + LOG_PATH + "' 2>/dev/null | grep 'KEY code=' | tail -n 12").then(function (r2) {
+            Luna.exec("tail -n +" + (startLine + 1) + " '" + LOG_PATH + "' 2>/dev/null | grep -E 'KEY (PRESS )?code=' | tail -n 12").then(function (r2) {
                 if (!r2.ok) return;
                 var codes = [];
-                (r2.stdout.match(/KEY code=(\d+)/g) || []).forEach(function (m) {
-                    var code = parseInt(m.replace('KEY code=', ''), 10);
+                (r2.stdout.match(/KEY (?:PRESS )?code=\d+/g) || []).forEach(function (m) {
+                    var code = parseInt(m.replace(/^.*code=/, ''), 10);
                     if (codes[codes.length - 1] !== code) codes.push(code);
                 });
                 if (!codes.length) return;

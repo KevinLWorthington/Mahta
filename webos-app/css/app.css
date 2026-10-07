@@ -291,7 +291,12 @@ h3 { font-size: 26px; margin: 24px 0 12px; color: #c8ccd2; }
 
 .modal-overlay {
     position: fixed;
-    inset: 0;
+    /* Longhands, not `inset`: older webOS Chromium (e.g. webOS 6 / Chrome 79)
+       ignores `inset`, leaving the overlay parked below the screen. */
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
     background: rgba(0, 0, 0, 0.72);
     display: flex;
     align-items: center;
