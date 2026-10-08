@@ -19,6 +19,7 @@ var state = {
     status: null,              // {so, env, init, run, cfg}
     apps: null,                // [{id, title}]
     busy: false,
+    output: '',                // text of the Status screen's Output box
     showProtected: false       // reveal nav/OK/Back/Power buttons (off each launch)
 };
 
@@ -170,12 +171,26 @@ function activate(node) {
     return true;
 }
 
+/*
+ * Up/Down on a focused .scroll-box (the Output box) scroll its text half a
+ * box at a time; only once it is at the top/bottom does focus move on.
+ * Returns true if it scrolled.
+ */
+function scrollFocused(dir) {
+    var n = document.activeElement;
+    if (!n || !n.classList || !n.classList.contains('scroll-box')) return false;
+    var max = n.scrollHeight - n.clientHeight;
+    if (dir < 0 ? n.scrollTop <= 0 : n.scrollTop >= max - 1) return false;
+    n.scrollTop = Math.max(0, Math.min(max, n.scrollTop + dir * Math.round(n.clientHeight / 2)));
+    return true;
+}
+
 document.addEventListener('keydown', function (e) {
     var k = e.keyCode;
     if (k === 37) { moveFocus('left'); e.preventDefault(); }
-    else if (k === 38) { moveFocus('up'); e.preventDefault(); }
+    else if (k === 38) { if (!scrollFocused(-1)) moveFocus('up'); e.preventDefault(); }
     else if (k === 39) { moveFocus('right'); e.preventDefault(); }
-    else if (k === 40) { moveFocus('down'); e.preventDefault(); }
+    else if (k === 40) { if (!scrollFocused(1)) moveFocus('down'); e.preventDefault(); }
     else if (k === 13) {
         if (activate(document.activeElement)) e.preventDefault();
     } else if (k === 461 || k === 27) { // webOS BACK / Esc
@@ -202,8 +217,29 @@ function onBack() {
     if (state.view !== 'status') {
         switchView('status');
     } else {
-        window.close();
+        confirmExit();
     }
+}
+
+/*
+ * Back on the entry screen. On webOS 6+ hand off to the system exit popup
+ * (this is what webOSTV.js's webOS.platformBack() calls); otherwise ask
+ * ourselves before closing, so one stray Back press doesn't quit the app.
+ */
+function confirmExit() {
+    if (window.PalmSystem && typeof window.PalmSystem.platformBack === 'function') {
+        window.PalmSystem.platformBack();
+        return;
+    }
+    var overlay;
+    var exit = btn('Exit', function () { window.close(); }, 'primary');
+    overlay = openModal('Exit Mahta?', [
+        el('div', { 'class': 'modal-actions' }, [
+            exit,
+            btn('Cancel', function () { closeModal(overlay); })
+        ])
+    ]);
+    setFocus(exit);
 }
 
 /* ================= modal ================= */
@@ -338,15 +374,23 @@ function hookActive() {
 
 function runScript(label, command, outputBox) {
     state.busy = true;
-    outputBox.textContent = label + '...\n';
+    // Kept in state, not just the box: the renderView() below builds a fresh
+    // Output box, which renderStatusView() refills from state.output.
+    state.output = label + '...\n';
+    outputBox.textContent = state.output;
     return Luna.exec(command).then(function (r) {
         state.busy = false;
-        outputBox.textContent += (r.stdout || '') + (r.stderr ? '\n' + r.stderr : '');
-        outputBox.textContent += r.ok ? '\n[done]' : '\n[FAILED]';
-        outputBox.scrollTop = outputBox.scrollHeight;
+        state.output += (r.stdout || '') + (r.stderr ? '\n' + r.stderr : '');
+        state.output += r.ok ? '\n[done]' : '\n[FAILED]';
+        outputBox.textContent = state.output;
         return loadStatus();
     }).then(function () {
         renderView();
+        // Bring the finished output on screen; focus stays on the button that ran it.
+        var box = $('#content .output-box');
+        if (box) {
+            try { box.scrollIntoView({ block: 'nearest' }); } catch (e) { /* older engines */ }
+        }
     });
 }
 
@@ -479,7 +523,10 @@ function renderStatusView(c) {
     ]);
     c.appendChild(grid);
 
-    var outputBox = el('pre', { 'class': 'output-box', text: '' });
+    // Focusable once it has text, so the D-pad can reach it and scroll long output.
+    var outputBox = el('pre', state.output
+        ? { 'class': 'output-box scroll-box focusable', tabindex: '-1', text: state.output }
+        : { 'class': 'output-box', text: '' });
     var actions = el('div', { 'class': 'action-row' });
 
     if (!hookInstalled()) {
@@ -503,6 +550,7 @@ function renderStatusView(c) {
     c.appendChild(actions);
     c.appendChild(el('h3', { text: 'Output' }));
     c.appendChild(outputBox);
+    outputBox.scrollTop = outputBox.scrollHeight;   // show the end of long script output
     c.appendChild(el('p', { 'class': 'hint', text: 'Installing restarts the remote input daemon. The remote may be unresponsive for a second or two.' }));
 }
 
@@ -746,8 +794,12 @@ function renderAppsView(c) {
             el('span', { 'class': 'cell mono appid', text: a.id })
         ]);
         row.addEventListener('click', function () {
-            Luna.exec("luna-send -n 1 'luna://com.webos.applicationManager/launch' '{\"id\":\"" + a.id + "\"}'")
-                .then(function (r) { toast(r.ok ? 'Launched ' + a.title : 'Launch failed', !r.ok); });
+            // launch is open to regular apps, so this needs no root shell (unlike listApps).
+            Luna.call('luna://com.webos.applicationManager/launch', { id: a.id }).then(function () {
+                toast('Launched ' + a.title);
+            }, function (e) {
+                toast('Launch failed: ' + e.message, true);
+            });
         });
         list.appendChild(row);
     });

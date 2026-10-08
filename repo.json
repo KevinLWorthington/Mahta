@@ -8,15 +8,15 @@
       "iconUri": "https://raw.githubusercontent.com/KevinLWorthington/lg-native-hook/main/webos-app/largeIcon.png",
       "manifest": {
         "id": "org.kevinlworthington.lginputhook",
-        "version": "0.9.3",
+        "version": "0.9.4",
         "type": "web",
         "title": "Mahta",
         "appDescription": "Remap LG Magic Remote buttons from the couch.",
         "iconUri": "https://raw.githubusercontent.com/KevinLWorthington/lg-native-hook/main/webos-app/largeIcon.png",
         "sourceUrl": "https://github.com/KevinLWorthington/Mahta",
         "rootRequired": true,
-        "ipkUrl": "https://github.com/KevinLWorthington/Mahta/releases/download/v0.9.3/org.kevinlworthington.lginputhook_0.9.3_all.ipk",
-        "ipkHash": { "sha256": "328d483a1a2b8b0779f96b1ba2746d9b7ee1c2cbdc011d88f753170a248476b9" }
+        "ipkUrl": "https://github.com/KevinLWorthington/Mahta/releases/download/v0.9.4/org.kevinlworthington.lginputhook_0.9.4_all.ipk",
+        "ipkHash": { "sha256": "" }
       }
     }
   ]
