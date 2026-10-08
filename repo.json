@@ -16,7 +16,7 @@
         "sourceUrl": "https://github.com/KevinLWorthington/Mahta",
         "rootRequired": true,
         "ipkUrl": "https://github.com/KevinLWorthington/Mahta/releases/download/v0.9.4/org.kevinlworthington.lginputhook_0.9.4_all.ipk",
-        "ipkHash": { "sha256": "" }
+        "ipkHash": { "sha256": "0ed2f0061248027c400453c048926782d62946d75683104e086e8ab34cc1e55e" }
       }
     }
   ]
