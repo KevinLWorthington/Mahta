@@ -5,6 +5,7 @@
 /uninstall.sh
 pkg/
 dist/
+dist-dev/
 .claude/
 webos-app/js/luna.mock.js
 

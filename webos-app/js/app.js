@@ -19,6 +19,7 @@ var state = {
     status: null,              // {so, env, init, run, cfg}
     apps: null,                // [{id, title}]
     busy: false,
+    output: '',                // text of the Status screen's Output box
     showProtected: false       // reveal nav/OK/Back/Power buttons (off each launch)
 };
 
@@ -170,12 +171,26 @@ function activate(node) {
     return true;
 }
 
+/*
+ * Up/Down on a focused .scroll-box (the Output box) scroll its text half a
+ * box at a time; only once it is at the top/bottom does focus move on.
+ * Returns true if it scrolled.
+ */
+function scrollFocused(dir) {
+    var n = document.activeElement;
+    if (!n || !n.classList || !n.classList.contains('scroll-box')) return false;
+    var max = n.scrollHeight - n.clientHeight;
+    if (dir < 0 ? n.scrollTop <= 0 : n.scrollTop >= max - 1) return false;
+    n.scrollTop = Math.max(0, Math.min(max, n.scrollTop + dir * Math.round(n.clientHeight / 2)));
+    return true;
+}
+
 document.addEventListener('keydown', function (e) {
     var k = e.keyCode;
     if (k === 37) { moveFocus('left'); e.preventDefault(); }
-    else if (k === 38) { moveFocus('up'); e.preventDefault(); }
+    else if (k === 38) { if (!scrollFocused(-1)) moveFocus('up'); e.preventDefault(); }
     else if (k === 39) { moveFocus('right'); e.preventDefault(); }
-    else if (k === 40) { moveFocus('down'); e.preventDefault(); }
+    else if (k === 40) { if (!scrollFocused(1)) moveFocus('down'); e.preventDefault(); }
     else if (k === 13) {
         if (activate(document.activeElement)) e.preventDefault();
     } else if (k === 461 || k === 27) { // webOS BACK / Esc
@@ -196,17 +211,35 @@ document.addEventListener('mouseover', function (e) {
 function onBack() {
     var modals = $all('.modal-overlay');
     if (modals.length) {
-        var m = modals[modals.length - 1];
-        if (m._onclose) m._onclose();
-        m.parentNode.removeChild(m);
-        focusFirst();
+        closeModal(modals[modals.length - 1]);
         return;
     }
     if (state.view !== 'status') {
         switchView('status');
     } else {
-        window.close();
+        confirmExit();
     }
+}
+
+/*
+ * Back on the entry screen. On webOS 6+ hand off to the system exit popup
+ * (this is what webOSTV.js's webOS.platformBack() calls); otherwise ask
+ * ourselves before closing, so one stray Back press doesn't quit the app.
+ */
+function confirmExit() {
+    if (window.PalmSystem && typeof window.PalmSystem.platformBack === 'function') {
+        window.PalmSystem.platformBack();
+        return;
+    }
+    var overlay;
+    var exit = btn('Exit', function () { window.close(); }, 'primary');
+    overlay = openModal('Exit Mahta?', [
+        el('div', { 'class': 'modal-actions' }, [
+            exit,
+            btn('Cancel', function () { closeModal(overlay); })
+        ])
+    ]);
+    setFocus(exit);
 }
 
 /* ================= modal ================= */
@@ -214,6 +247,8 @@ function onBack() {
 function openModal(title, bodyNodes, onclose) {
     var overlay = el('div', { 'class': 'modal-overlay' });
     overlay._onclose = onclose || null;
+    // Remember what opened the modal so closing it puts focus back there.
+    overlay._returnFocus = document.activeElement;
     var box = el('div', { 'class': 'modal' }, [
         el('h2', { text: title })
     ]);
@@ -228,7 +263,9 @@ function closeModal(overlay) {
     if (!overlay || !overlay.parentNode) return;
     if (overlay._onclose) overlay._onclose();
     overlay.parentNode.removeChild(overlay);
-    focusFirst();
+    var back = overlay._returnFocus;
+    if (back && back !== document.body && document.body.contains(back)) setFocus(back);
+    else focusFirst();
 }
 
 /* ================= config load/save ================= */
@@ -337,15 +374,23 @@ function hookActive() {
 
 function runScript(label, command, outputBox) {
     state.busy = true;
-    outputBox.textContent = label + '...\n';
+    // Kept in state, not just the box: the renderView() below builds a fresh
+    // Output box, which renderStatusView() refills from state.output.
+    state.output = label + '...\n';
+    outputBox.textContent = state.output;
     return Luna.exec(command).then(function (r) {
         state.busy = false;
-        outputBox.textContent += (r.stdout || '') + (r.stderr ? '\n' + r.stderr : '');
-        outputBox.textContent += r.ok ? '\n[done]' : '\n[FAILED]';
-        outputBox.scrollTop = outputBox.scrollHeight;
+        state.output += (r.stdout || '') + (r.stderr ? '\n' + r.stderr : '');
+        state.output += r.ok ? '\n[done]' : '\n[FAILED]';
+        outputBox.textContent = state.output;
         return loadStatus();
     }).then(function () {
         renderView();
+        // Bring the finished output on screen; focus stays on the button that ran it.
+        var box = $('#content .output-box');
+        if (box) {
+            try { box.scrollIntoView({ block: 'nearest' }); } catch (e) { /* older engines */ }
+        }
     });
 }
 
@@ -415,14 +460,40 @@ function renderSidebar() {
     });
 }
 
+/*
+ * Selector that finds the "same" focusable again after a re-render, for
+ * elements that carry an identifying data attribute.
+ */
+function focusKey(node) {
+    var attrs = ['data-code', 'data-app', 'data-toggle'];
+    for (var i = 0; i < attrs.length; i++) {
+        if (node.hasAttribute(attrs[i])) return '[' + attrs[i] + '="' + node.getAttribute(attrs[i]) + '"]';
+    }
+    return null;
+}
+
 function renderView() {
     var c = $('#content');
+    // If focus is inside the view, re-render must not throw it back to the sidebar:
+    // find the same element again by key, else the focusable at the same position.
+    var active = document.activeElement;
+    var key = null, index = -1;
+    if (active && active !== c && c.contains(active)) {
+        key = focusKey(active);
+        index = $all('.focusable', c).indexOf(active);
+    }
     c.innerHTML = '';
     if (state.view === 'status') renderStatusView(c);
     else if (state.view === 'remote') renderRemoteView(c);
     else if (state.view === 'buttons') renderButtonsView(c);
     else if (state.view === 'apps') renderAppsView(c);
-    if (!document.activeElement || document.activeElement === document.body) focusFirst();
+    var restore = key ? $(key, c) : null;
+    if (!restore && index >= 0) {
+        var items = $all('.focusable', c);
+        if (items.length) restore = items[Math.min(index, items.length - 1)];
+    }
+    if (restore) setFocus(restore);
+    else if (!document.activeElement || document.activeElement === document.body) focusFirst();
 }
 
 /* ---------- status view ---------- */
@@ -452,7 +523,10 @@ function renderStatusView(c) {
     ]);
     c.appendChild(grid);
 
-    var outputBox = el('pre', { 'class': 'output-box', text: '' });
+    // Focusable once it has text, so the D-pad can reach it and scroll long output.
+    var outputBox = el('pre', state.output
+        ? { 'class': 'output-box scroll-box focusable', tabindex: '-1', text: state.output }
+        : { 'class': 'output-box', text: '' });
     var actions = el('div', { 'class': 'action-row' });
 
     if (!hookInstalled()) {
@@ -476,6 +550,7 @@ function renderStatusView(c) {
     c.appendChild(actions);
     c.appendChild(el('h3', { text: 'Output' }));
     c.appendChild(outputBox);
+    outputBox.scrollTop = outputBox.scrollHeight;   // show the end of long script output
     c.appendChild(el('p', { 'class': 'hint', text: 'Installing restarts the remote input daemon. The remote may be unresponsive for a second or two.' }));
 }
 
@@ -486,14 +561,17 @@ function confirmUninstall(outputBox) {
         var answer = removeConfig ? 'y' : 'n';
         runScript('Uninstalling', "echo " + answer + " | sh '" + APP_DIR + "/assets/uninstall.sh' 2>&1", outputBox);
     };
+    var cancel = btn('Cancel', function () { closeModal(overlay); });
     overlay = openModal('Uninstall hook?', [
         el('p', { text: 'This removes the hook and restores the remote to stock behavior.' }),
         el('div', { 'class': 'modal-actions' }, [
             btn('Uninstall, keep my keybinds', function () { run(false); }),
             btn('Uninstall and delete keybinds', function () { run(true); }, 'danger'),
-            btn('Cancel', function () { closeModal(overlay); })
+            cancel
         ])
     ]);
+    // Default to the safe choice so a stray OK press doesn't uninstall.
+    setFocus(cancel);
 }
 
 /* ---------- remote view (SVG) ---------- */
@@ -615,7 +693,7 @@ function renderButtonsView(c) {
         if (isProtected(code) && !state.showProtected) { hidden++; return; }
         var k = keyByCode(code);
         var b = bindingFor(code);
-        var row = el('div', { 'class': 'list-row focusable', tabindex: '-1' }, [
+        var row = el('div', { 'class': 'list-row focusable', tabindex: '-1', 'data-code': code }, [
             el('span', { 'class': 'cell name', text: k ? k.name : 'Unknown button' }),
             el('span', { 'class': 'cell mono code', text: String(code) }),
             el('span', { 'class': 'cell mono key', text: k ? k.key : '—' }),
@@ -644,37 +722,55 @@ function openDetector() {
     var seen = el('div', { 'class': 'detected-keys', text: 'Waiting for a button press…' });
     var startLine = 0;
     var timer = null;
+    var closed = false;   // set on close; stops any poll still in flight
+    var shown = '';       // codes currently listed, to skip no-op rebuilds
     var overlay = openModal('Identify a button', [
         el('p', { text: 'Press any button on the remote. Its code will appear at the top of the list below.' }),
         seen,
         el('div', { 'class': 'modal-actions' }, [
             btn('Close', function () { closeModal(overlay); })
         ])
-    ], function () { clearInterval(timer); });
+    ], function () { closed = true; clearTimeout(timer); });
+
+    function showCodes(stdout) {
+        var codes = [];
+        (stdout.match(/KEY (?:PRESS )?code=\d+/g) || []).forEach(function (m) {
+            var code = parseInt(m.replace(/^.*code=/, ''), 10);
+            if (codes[codes.length - 1] !== code) codes.push(code);
+        });
+        codes = codes.slice(-6).reverse();
+        if (!codes.length || codes.join(',') === shown) return;
+        shown = codes.join(',');
+        // Rebuilding drops focus from a row the user may be on; put it back by code.
+        var focused = document.activeElement;
+        var focusedCode = seen.contains(focused) ? focused.getAttribute('data-code') : null;
+        seen.innerHTML = '';
+        codes.forEach(function (code) {
+            var k = keyByCode(code);
+            var row = el('div', { 'class': 'detected-row focusable', tabindex: '-1', 'data-code': code, text: (k ? k.name : 'Unknown') + ' — code ' + code });
+            row.addEventListener('click', function () {
+                closeModal(overlay);
+                openMappingEditor(code);
+            });
+            seen.appendChild(row);
+            if (String(code) === focusedCode) setFocus(row);
+        });
+    }
+
+    // Chained timeouts, not setInterval, so a slow exec can't stack up polls.
+    function schedule() {
+        if (!closed) timer = setTimeout(poll, 1000);
+    }
+
+    function poll() {
+        Luna.exec("tail -n +" + (startLine + 1) + " '" + LOG_PATH + "' 2>/dev/null | grep -E 'KEY (PRESS )?code=' | tail -n 12").then(function (r2) {
+            if (!closed && r2.ok) showCodes(r2.stdout);
+        }).then(schedule, schedule);
+    }
 
     Luna.exec("wc -l < '" + LOG_PATH + "' 2>/dev/null || echo 0").then(function (r) {
         startLine = parseInt(r.stdout, 10) || 0;
-        timer = setInterval(function () {
-            Luna.exec("tail -n +" + (startLine + 1) + " '" + LOG_PATH + "' 2>/dev/null | grep -E 'KEY (PRESS )?code=' | tail -n 12").then(function (r2) {
-                if (!r2.ok) return;
-                var codes = [];
-                (r2.stdout.match(/KEY (?:PRESS )?code=\d+/g) || []).forEach(function (m) {
-                    var code = parseInt(m.replace(/^.*code=/, ''), 10);
-                    if (codes[codes.length - 1] !== code) codes.push(code);
-                });
-                if (!codes.length) return;
-                seen.innerHTML = '';
-                codes.slice(-6).reverse().forEach(function (code) {
-                    var k = keyByCode(code);
-                    var row = el('div', { 'class': 'detected-row focusable', tabindex: '-1', text: (k ? k.name : 'Unknown') + ' — code ' + code });
-                    row.addEventListener('click', function () {
-                        closeModal(overlay);
-                        openMappingEditor(code);
-                    });
-                    seen.appendChild(row);
-                });
-            });
-        }, 1000);
+        schedule();
     });
 }
 
@@ -693,13 +789,17 @@ function renderAppsView(c) {
     c.appendChild(el('p', { 'class': 'hint', text: 'These app IDs can be assigned to buttons. Select one to test-launch it.' }));
     var list = el('div', { 'class': 'button-list' });
     state.apps.forEach(function (a) {
-        var row = el('div', { 'class': 'list-row focusable' + (a.visible ? '' : ' dim'), tabindex: '-1' }, [
+        var row = el('div', { 'class': 'list-row focusable' + (a.visible ? '' : ' dim'), tabindex: '-1', 'data-app': a.id }, [
             el('span', { 'class': 'cell name', text: a.title }),
             el('span', { 'class': 'cell mono appid', text: a.id })
         ]);
         row.addEventListener('click', function () {
-            Luna.exec("luna-send -n 1 'luna://com.webos.applicationManager/launch' '{\"id\":\"" + a.id + "\"}'")
-                .then(function (r) { toast(r.ok ? 'Launched ' + a.title : 'Launch failed', !r.ok); });
+            // launch is open to regular apps, so this needs no root shell (unlike listApps).
+            Luna.call('luna://com.webos.applicationManager/launch', { id: a.id }).then(function () {
+                toast('Launched ' + a.title);
+            }, function (e) {
+                toast('Launch failed: ' + e.message, true);
+            });
         });
         list.appendChild(row);
     });
@@ -774,13 +874,17 @@ function optionRow(title, desc, selected, onpick) {
 }
 
 function confirmCritical(name, onConfirm) {
-    var overlay = openModal('Remap "' + name + '"?', [
+    var overlay;
+    var cancel = btn('Cancel', function () { closeModal(overlay); });
+    overlay = openModal('Remap "' + name + '"?', [
         el('p', { text: 'This button is used to navigate the TV. If you remap it you may not be able to use menus or this app with the remote. You will need to SSH into your TV to fix the hook.' }),
         el('div', { 'class': 'modal-actions' }, [
             btn('I understand, remap it', function () { closeModal(overlay); onConfirm(); }, 'danger'),
-            btn('Cancel', function () { closeModal(overlay); })
+            cancel
         ])
     ]);
+    // Default to the safe choice so a stray OK press doesn't remap a navigation key.
+    setFocus(cancel);
 }
 
 function openKeyPicker(forName, onPick) {
