@@ -116,7 +116,13 @@ h3 { font-size: 26px; margin: 24px 0 12px; color: #c8ccd2; }
 .status-pill.good { background: #143d2b; color: #5fdd9d; }
 .status-pill.bad  { background: #43181d; color: #ff8a8a; }
 
-.action-row { display: flex; flex-wrap: wrap; gap: 18px; margin-bottom: 8px; }
+/*
+ * No flex `gap` anywhere in this file: older webOS Chromium (e.g. webOS 6 /
+ * Chrome 79) ignores it. Wrapping rows use child margins plus a matching
+ * negative container margin so spacing is identical to `gap: 18px`.
+ */
+.action-row { display: flex; flex-wrap: wrap; margin: 0 -18px -18px 0; }
+.action-row > * { margin: 0 18px 18px 0; }
 
 .btn {
     background: #2a2f38;
@@ -149,11 +155,12 @@ h3 { font-size: 26px; margin: 24px 0 12px; color: #c8ccd2; }
 
 /* ---------- remote view ---------- */
 
-.remote-wrap { display: flex; gap: 56px; align-items: flex-start; }
+.remote-wrap { display: flex; align-items: flex-start; }
 
 .remote-svg {
     height: 880px;
     flex: 0 0 auto;
+    margin-right: 56px;
 }
 
 .remote-body { fill: #20242c; stroke: #343b47; stroke-width: 2; }
@@ -197,7 +204,6 @@ h3 { font-size: 26px; margin: 24px 0 12px; color: #c8ccd2; }
 .toggle {
     display: flex;
     align-items: center;
-    gap: 16px;
     background: #1b1f26;
     border: 3px solid transparent;
     border-radius: 14px;
@@ -220,6 +226,7 @@ h3 { font-size: 26px; margin: 24px 0 12px; color: #c8ccd2; }
     color: #4cd97b;
     font-size: 24px;
     font-weight: 700;
+    margin-right: 16px;
 }
 
 .toggle.on .toggle-box { border-color: #4cd97b; }
@@ -239,7 +246,8 @@ h3 { font-size: 26px; margin: 24px 0 12px; color: #c8ccd2; }
 .settings-card .toggle:focus { background: #262c36; }
 
 .legend { background: #1b1f26; border-radius: 18px; padding: 24px 28px; margin-bottom: 28px; }
-.legend-item { display: flex; align-items: center; gap: 14px; margin-bottom: 10px; font-size: 22px; }
+.legend-item { display: flex; align-items: center; margin-bottom: 10px; font-size: 22px; }
+.legend-item .dot { margin-right: 14px; }
 
 .dot { display: inline-block; width: 20px; height: 20px; border-radius: 50%; }
 .dot.map-disable { background: #ff5252; }
@@ -267,7 +275,6 @@ h3 { font-size: 26px; margin: 24px 0 12px; color: #c8ccd2; }
 .list-row {
     display: flex;
     align-items: center;
-    gap: 24px;
     background: #1b1f26;
     border: 3px solid transparent;
     border-radius: 14px;
@@ -277,6 +284,8 @@ h3 { font-size: 26px; margin: 24px 0 12px; color: #c8ccd2; }
 
 .list-row:focus { border-color: #d4145a; background: #262c36; transform: scale(1.01); }
 .list-row.dim { opacity: 0.55; }
+
+.list-row > .cell + .cell { margin-left: 24px; }
 
 .cell.name { flex: 0 0 320px; font-size: 25px; }
 .cell.code { flex: 0 0 110px; }
@@ -316,7 +325,8 @@ h3 { font-size: 26px; margin: 24px 0 12px; color: #c8ccd2; }
 
 .modal p { margin-bottom: 16px; line-height: 1.45; }
 
-.modal-actions { display: flex; gap: 18px; margin-top: 28px; flex-wrap: wrap; }
+.modal-actions { display: flex; flex-wrap: wrap; margin: 28px -18px -18px 0; }
+.modal-actions > * { margin: 0 18px 18px 0; }
 
 .option-list { margin-top: 20px; }
 
